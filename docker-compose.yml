@@ -36,7 +36,7 @@ services:
     restart: always
 
   message-server:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile.server
     command: uvicorn server.server:app --host 0.0.0.0 --port 8000
@@ -61,6 +61,22 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    restart: always
+
+  webapp:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    command: python web/webapp.py
+    ports:
+      - "5000:5000"
+    networks:
+      - public
+    environment:
+      - SERVER_URL=ws://message-server:8000/ws
+    depends_on:
+      message-server:
+        condition: service_healthy
     restart: always
 
 networks:
