@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureChat - E2EE</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- Экран авторизации -->
+    <div id="auth-screen" class="screen active">
+        <div class="auth-container">
+            <div class="logo">
+                <div class="lock-icon">&#128274;</div>
+                <h1>SecureChat</h1>
+                <p class="subtitle">End-to-End Encrypted</p>
+            </div>
+            
+            <div class="tabs">
+                <button class="tab active" id="tab-login">Вход</button>
+                <button class="tab" id="tab-register">Регистрация</button>
+            </div>
+            
+            <!-- Форма входа -->
+            <form id="login-form" class="auth-form active">
+                <div class="form-group">
+                    <label for="login-username">Имя пользователя</label>
+                    <input type="text" id="login-username" placeholder="alice" required autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Пароль</label>
+                    <input type="password" id="login-password" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Войти</button>
+            </form>
+            
+            <!-- Форма регистрации -->
+            <form id="register-form" class="auth-form">
+                <div class="form-group">
+                    <label for="register-username">Имя пользователя</label>
+                    <input type="text" id="register-username" placeholder="alice" required autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="register-password">Пароль</label>
+                    <input type="password" id="register-password" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Зарегистрироваться</button>
+            </form>
+            
+            <div id="auth-error" class="error-message"></div>
+        </div>
+    </div>
+    
+    <!-- Экран чата -->
+    <div id="chat-screen" class="screen">
+        <div class="chat-container">
+            <!-- Боковая панель -->
+            <div class="sidebar">
+                <div class="sidebar-header">
+                    <h2>SecureChat</h2>
+                    <span class="status-badge encrypted">E2EE</span>
+                </div>
+                
+                <div class="user-info">
+                    <div class="avatar" id="user-avatar">?</div>
+                    <div class="user-details">
+                        <span id="current-username">username</span>
+                        <span class="user-status online">online</span>
+                    </div>
+                </div>
+                
+                <div class="contacts">
+                    <h3>Контакты</h3>
+                    <div id="contacts-list"></div>
+                    <div class="add-contact">
+                        <input type="text" id="contact-input" placeholder="Добавить контакт..." autocomplete="off">
+                        <button id="add-contact-btn">+</button>
+                    </div>
+                </div>
+                
+                <button class="btn btn-logout" id="logout-btn">Выйти</button>
+            </div>
+            
+            <!-- Область чата -->
+            <div class="chat-area">
+                <div class="chat-header">
+                    <div class="chat-contact-info">
+                        <span class="contact-name" id="chat-partner">Выберите контакт</span>
+                        <span class="fingerprint" id="fingerprint-display"></span>
+                    </div>
+                </div>
+                
+                <div class="messages" id="messages-container">
+                    <div class="welcome-message">
+                        <div class="welcome-icon">&#128274;</div>
+                        <h3>Защищённый чат</h3>
+                        <p>Все сообщения шифруются end-to-end</p>
+                        <p class="protocol-info">X3DH + Double Ratchet + AES-256-GCM</p>
+                    </div>
+                </div>
+                
+                <div class="message-input-area">
+                    <div class="input-container">
+                        <input 
+                            type="text" 
+                            id="message-input" 
+                            placeholder="Введите сообщение..." 
+                            disabled
+                            autocomplete="off"
+                        >
+                        <button class="btn btn-send" id="send-button" disabled>Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/chat.js"></script>
+</body>
+</html>

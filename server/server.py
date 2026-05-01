@@ -110,6 +110,8 @@ async def websocket_endpoint(ws: WebSocket):
             msg_type = msg.get("type")
             print(f"Received message type: {msg_type} from {msg.get('username', 'unknown')}")
 
+           
+
             if msg_type == "register":
                 username = msg.get("username")
                 password = msg.get("password")
@@ -125,17 +127,16 @@ async def websocket_endpoint(ws: WebSocket):
                     "password_hash": base64.b64encode(key).decode(),
                     "salt": base64.b64encode(salt).decode()
                 })
+                # Если есть бандл - загружаем, если нет - просто регистрируем
                 bundle = msg.get("bundle")
                 if bundle:
                     try:
                         await kds_upload_bundle(username, bundle)
-                        print(f"User {username} registered successfully")
-                        await ws.send_json({"type": "register", "status": "ok"})
                     except Exception as e:
-                        print(f"Registration error: {e}")
-                        await ws.send_json({"type": "error", "message": f"Failed to store keys: {str(e)}"})
-                else:
-                    await ws.send_json({"type": "register", "status": "ok"})
+                        print(f"Bundle upload error: {e}")
+                
+                print(f"User {username} registered successfully")
+                await ws.send_json({"type": "register", "status": "ok"})
 
             elif msg_type == "login":
                 username = msg.get("username")

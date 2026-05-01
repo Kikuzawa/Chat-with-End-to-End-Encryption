@@ -1,47 +1,55 @@
-# Защищённый E2EE чат (курсовой проект)
+# 🔐 Защищённый E2EE чат
 
-Реализация защищённого чата с сквозным шифрованием по протоколу Signal:
-- ECDH на Curve25519, X3DH, Double Ratchet, AES-256-GCM, HKDF-SHA256.
-- Серверная часть: KDS (Key Distribution Server) и MessageServer (FastAPI WebSocket).
-- Клиент: CLI с криптографией на стороне пользователя.
-- Хранение ключей: тома Docker для `/app/keys`, логи `/app/logs`.
-- Безопасность: PBKDF2 для паролей, replay protection, ротация SPK.
+Курсовой проект: чат с end-to-end шифрованием на Python.
 
-## Развёртывание
+## Криптография
+- **Key Agreement:** X3DH (Extended Triple Diffie-Hellman)
+- **Ratchet:** Double Ratchet Algorithm
+- **Шифрование:** AES-256-GCM (IV: 12 байт, tag: 16 байт)
+- **KDF:** HKDF-SHA256
+- **Кривые:** Curve25519 (X25519 + Ed25519)
 
-1. Установите Docker и docker-compose.
-2. Клонируйте репозиторий и перейдите в папку `secure-chat`.
-3. Соберите и запустите сервисы:
+
+## Быстрый старт
+
+### Docker (рекомендуется)
 ```bash
 docker-compose up -d --build
 ```
 
+# Терминал 1: KDS
+python -m uvicorn server.kds:app --host 0.0.0.0 --port 8001
 
-## Запуск клиента
+# Терминал 2: Message Server  
+python -m uvicorn server.server:app --host 0.0.0.0 --port 8000
 
-Установите зависимости:
+# Терминал 3: Регистрация
+python client/cli.py register -u alice -p alice123
+python client/cli.py register -u bob -p bob123
 
-```bash
-pip install -r requirements.txt
-```
-Генерация ключей и регистрация:
+# Терминал 4: Чат
+python client/cli.py chat -u alice -p alice123 -r bob
+python client/cli.py chat -u bob -p bob123 -r alice
 
-```bash
-python client/cli.py register
-```
-Отправка сообщения:
-
-```bash
-python client/cli.py send -r username -m "secret text"
-```
-Приём сообщений в реальном времени:
-
-```bash
-python client/cli.py listen
-```
+Команды
+Команда	Описание
+register -u USER -p PASS	Регистрация нового пользователя
+chat -u USER -p PASS -r RECIPIENT	Интерактивный чат
+send -u USER -p PASS -r RECIPIENT -m MSG	Отправить сообщение
+listen -u USER -p PASS	Ожидание входящих сообщений
 
 Тестирование
-```bash
+bash
 pytest tests/ -v
-```
-Включает тесты X3DH, Double Ratchet, AES-GCM по векторам NIST.
+
+
+Безопасность
+Пароли хешируются PBKDF2-SHA256 (100 000 итераций)
+
+TLS 1.3 для WebSocket (WSS)
+
+Forward secrecy через Double Ratchet
+
+Replay protection через порядковые номера сообщений
+
+Ротация SPK каждые 7 дней
