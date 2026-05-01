@@ -1,0 +1,75 @@
+services:
+  redis:
+    image: redis:7-alpine
+    networks:
+      - internal
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: always
+
+  kds:
+    build: 
+      context: .
+      dockerfile: Dockerfile.kds
+    command: uvicorn server.kds:app --host 0.0.0.0 --port 8001
+    networks:
+      - internal
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - KDS_API_KEY=internal-secret-key
+    volumes:
+      - server_keys:/app/keys
+      - server_logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: always
+
+  message-server:
+    build: 
+      context: .
+      dockerfile: Dockerfile.server
+    command: uvicorn server.server:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    networks:
+      - public
+      - internal
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - KDS_API_KEY=internal-secret-key
+    volumes:
+      - server_keys:/app/keys
+      - server_logs:/app/logs
+    depends_on:
+      kds:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: always
+
+networks:
+  internal:
+    internal: true
+  public:
+    driver: bridge
+
+volumes:
+  redis_data:
+  server_keys:
+  server_logs:
