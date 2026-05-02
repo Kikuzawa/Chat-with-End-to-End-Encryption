@@ -254,13 +254,14 @@ def _key_path(username: str) -> str:
     return os.path.join(key_dir, f"{username}.json")
 
 
-def _load_or_create_km(username: str) -> KeyManager:
+def _load_or_create_km(username: str) -> tuple:
+    """Returns (km, loaded_from_disk: bool)."""
     path = _key_path(username)
     if os.path.exists(path):
         try:
             km = KeyManager.load_keys(path)
             logger.info(f"Loaded existing keys for {username}")
-            return km
+            return km, True
         except Exception as e:
             logger.warning(f"Failed to load keys for {username}: {e}, generating new ones")
     km = KeyManager(storage_path=path)
@@ -268,7 +269,7 @@ def _load_or_create_km(username: str) -> KeyManager:
     km.generate_spk()
     km.generate_opks(10)
     km.username = username
-    return km
+    return km, False
 
 
 @socketio.on('register')
@@ -279,12 +280,11 @@ def handle_register(data):
         emit('register_response', {'error': 'Заполните все поля'})
         return
 
-    km = _load_or_create_km(username)
+    km, keys_from_disk = _load_or_create_km(username)
 
     sid = request.sid
 
     async def do_register():
-        # Регистрация
         ws_reg = await websockets.connect(MESSAGE_SERVER_URL)
         await ws_reg.send(json.dumps({
             "type": "register",
@@ -294,19 +294,27 @@ def handle_register(data):
         }))
         resp = json.loads(await ws_reg.recv())
         await ws_reg.close()
-        if resp.get("status") != "ok" and resp.get("message") != "User already exists":
-            raise ValueError(resp.get("message", "Ошибка регистрации"))
 
-        # Сохраняем ключи после успешной регистрации
-        km.save_keys(username)
+        if resp.get("status") != "ok":
+            if resp.get("message") == "User already exists":
+                if not keys_from_disk:
+                    # Fresh keys but user already in KDS — keys won't match, refuse
+                    raise ValueError(
+                        "Пользователь уже зарегистрирован, но локальные ключи отсутствуют. "
+                        "Сбросьте данные сервера и зарегистрируйтесь заново."
+                    )
+                # Loaded matching keys from disk — just proceed to login
+            else:
+                raise ValueError(resp.get("message", "Ошибка регистрации"))
+        else:
+            # Fresh registration success — persist keys now
+            km.save_keys(username)
 
-        # Логин
         st = await _connect_and_login(username, password, sid)
         st.km = km
         _users[username] = st
 
     try:
-        # Временно ставим km, чтобы _connect_and_login мог его найти
         if username not in _users:
             _users[username] = UserState(km=km, ws=None, sid=sid)
         else:
@@ -330,7 +338,7 @@ def handle_login(data):
         return
 
     if username not in _users:
-        km = _load_or_create_km(username)
+        km, _ = _load_or_create_km(username)
         _users[username] = UserState(km=km, ws=None, sid=request.sid)
 
     sid = request.sid
