@@ -73,6 +73,9 @@ services:
       - chatnet
     environment:
       - SERVER_URL=ws://message-server:8000/ws
+      - KEY_DIR=/app/webapp_keys
+    volumes:
+      - webapp_keys:/app/webapp_keys
     depends_on:
       message-server:
         condition: service_healthy
@@ -89,3 +92,4 @@ volumes:
   redis_data:
   server_keys:
   server_logs:
+  webapp_keys:

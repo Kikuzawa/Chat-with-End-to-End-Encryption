@@ -249,6 +249,28 @@ def handle_disconnect():
             break
 
 
+def _key_path(username: str) -> str:
+    key_dir = os.getenv("KEY_DIR", "/app/keys")
+    return os.path.join(key_dir, f"{username}.json")
+
+
+def _load_or_create_km(username: str) -> KeyManager:
+    path = _key_path(username)
+    if os.path.exists(path):
+        try:
+            km = KeyManager.load_keys(path)
+            logger.info(f"Loaded existing keys for {username}")
+            return km
+        except Exception as e:
+            logger.warning(f"Failed to load keys for {username}: {e}, generating new ones")
+    km = KeyManager(storage_path=path)
+    km.generate_identity_key()
+    km.generate_spk()
+    km.generate_opks(10)
+    km.username = username
+    return km
+
+
 @socketio.on('register')
 def handle_register(data):
     username = (data.get('username') or '').strip()
@@ -257,11 +279,7 @@ def handle_register(data):
         emit('register_response', {'error': 'Заполните все поля'})
         return
 
-    km = KeyManager()
-    km.generate_identity_key()
-    km.generate_spk()
-    km.generate_opks(10)
-    km.username = username
+    km = _load_or_create_km(username)
 
     sid = request.sid
 
@@ -278,6 +296,9 @@ def handle_register(data):
         await ws_reg.close()
         if resp.get("status") != "ok" and resp.get("message") != "User already exists":
             raise ValueError(resp.get("message", "Ошибка регистрации"))
+
+        # Сохраняем ключи после успешной регистрации
+        km.save_keys(username)
 
         # Логин
         st = await _connect_and_login(username, password, sid)
@@ -309,11 +330,7 @@ def handle_login(data):
         return
 
     if username not in _users:
-        km = KeyManager()
-        km.generate_identity_key()
-        km.generate_spk()
-        km.generate_opks(10)
-        km.username = username
+        km = _load_or_create_km(username)
         _users[username] = UserState(km=km, ws=None, sid=request.sid)
 
     sid = request.sid
