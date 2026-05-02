@@ -337,14 +337,34 @@ def handle_login(data):
         emit('login_response', {'error': 'Заполните все поля'})
         return
 
+    needs_bundle_update = False
     if username not in _users:
-        km, _ = _load_or_create_km(username)
+        km, keys_from_disk = _load_or_create_km(username)
         _users[username] = UserState(km=km, ws=None, sid=request.sid)
+        needs_bundle_update = not keys_from_disk
 
     sid = request.sid
 
+    async def do_login():
+        st = await _connect_and_login(username, password, sid)
+        if needs_bundle_update:
+            km = st.km
+            await st.ws.send(json.dumps({
+                "type": "update_bundle",
+                "bundle": km.export_bundle(),
+            }))
+            resp = await _ws_recv(st, timeout=10)
+            if resp.get("status") == "ok":
+                km.save_keys(username)
+                # Invalidate any sessions that used the old keys
+                for k in [k for k in _sessions if username in k]:
+                    del _sessions[k]
+                logger.info(f"Updated KDS bundle and saved new keys for {username}")
+            else:
+                logger.warning(f"Bundle update failed for {username}: {resp}")
+
     try:
-        st = _run_async(_connect_and_login(username, password, sid))
+        _run_async(do_login())
         join_room(sid)
         emit('login_response', {'status': 'ok', 'username': username})
         logger.info(f"Logged in: {username}")
