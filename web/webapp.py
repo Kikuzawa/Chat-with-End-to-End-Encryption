@@ -45,8 +45,9 @@ class _MemHandler(logging.Handler):
         self._buf: collections.deque = collections.deque(maxlen=maxlen)
 
     def emit(self, record: logging.LogRecord):
+        from datetime import datetime
         self._buf.append({
-            "time":  self.formatTime(record, "%H:%M:%S"),
+            "time":  datetime.fromtimestamp(record.created).strftime("%H:%M:%S"),
             "level": record.levelname,
             "name":  record.name,
             "msg":   record.getMessage(),
