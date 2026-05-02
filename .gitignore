@@ -83,3 +83,6 @@ site/
 # ─── Red Hat/Fedora специфичные ──────────────────────────────
 *.rpm
 *.spec
+
+__pycache__/
+.pytest_cache/
