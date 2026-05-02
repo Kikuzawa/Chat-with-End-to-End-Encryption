@@ -16,11 +16,12 @@ import asyncio
 import threading
 import logging
 import base64
+import collections
 from dataclasses import dataclass, field
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room
 import secrets
@@ -35,6 +36,29 @@ logging.basicConfig(
     datefmt='%H:%M:%S'
 )
 logger = logging.getLogger(__name__)
+
+
+class _MemHandler(logging.Handler):
+    """Хранит последние N лог-записей в памяти для страницы /logs."""
+    def __init__(self, maxlen: int = 600):
+        super().__init__()
+        self._buf: collections.deque = collections.deque(maxlen=maxlen)
+
+    def emit(self, record: logging.LogRecord):
+        self._buf.append({
+            "time":  self.formatTime(record, "%H:%M:%S"),
+            "level": record.levelname,
+            "name":  record.name,
+            "msg":   record.getMessage(),
+        })
+
+    def records(self):
+        return list(self._buf)
+
+
+_mem_handler = _MemHandler()
+_mem_handler.setLevel(logging.DEBUG)
+logging.getLogger().addHandler(_mem_handler)
 
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
@@ -129,13 +153,15 @@ def _decrypt_incoming(username: str, sender: str, msg_data: dict) -> str:
     if key not in _sessions:
         if msg_data.get("type") != "prekey":
             raise ValueError("Ожидается prekey-сообщение")
+        # Build OPK priv dict: base64(pub) → priv, so receive_session can compute dh4
+        opk_priv_dict = {base64.b64encode(pub).decode(): priv for priv, pub in km.opks}
         state = SessionManager.receive_session(
             km.ik_x25519_priv, km.ik_x25519_pub,
             km.spk_priv, km.spk_pub,
-            {},
+            opk_priv_dict,
             base64.b64decode(msg_data["ik_a_pub"]),
             base64.b64decode(msg_data["ek_a_pub"]),
-            None
+            msg_data.get("opk_id")
         )
         _sessions[key] = state
 
@@ -177,6 +203,21 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/logs')
+def logs_page():
+    return render_template('logs.html')
+
+
+@app.route('/api/logs')
+def api_logs():
+    since = request.args.get('since', 0, type=int)
+    all_records = _mem_handler.records()
+    return jsonify({
+        "logs":  all_records[since:],
+        "total": len(all_records),
+    })
+
+
 # ── Socket.IO обработчики ─────────────────────────────────────────────────────
 
 @socketio.on('connect')
@@ -189,6 +230,21 @@ def handle_disconnect():
     for uname, st in list(_users.items()):
         if st.sid == request.sid:
             logger.info(f"Browser disconnected: {uname}")
+            async def _cleanup(s=st):
+                if s.listener_task:
+                    s.listener_task.cancel()
+                if s.ws:
+                    try:
+                        await s.ws.close()
+                    except Exception:
+                        pass
+            try:
+                _run_async(_cleanup(), timeout=3)
+            except Exception:
+                pass
+            # km сохраняем — он нужен при повторном входе (ключи совпадут с KDS)
+            st.ws = None
+            st.listener_task = None
             break
 
 
@@ -296,8 +352,12 @@ def handle_send_message(data):
             if resp.get("type") != "bundle":
                 raise ValueError("Не удалось получить ключи получателя")
 
+            bundle = resp["bundle"]
+            # Извлекаем OPK id ДО initiate_session, чтобы передать получателю
+            opk_id = (bundle.get("opk") or {}).get("public")
+
             rstate, ek_pub, _ = SessionManager.initiate_session(
-                km.ik_x25519_priv, km.ik_x25519_pub, resp["bundle"], None
+                km.ik_x25519_priv, km.ik_x25519_pub, bundle, None
             )
             _sessions[key] = rstate
 
@@ -306,7 +366,7 @@ def handle_send_message(data):
                 "type":       "prekey",
                 "ik_a_pub":   base64.b64encode(km.ik_x25519_pub).decode(),
                 "ek_a_pub":   base64.b64encode(ek_pub).decode(),
-                "opk_id":     None,
+                "opk_id":     opk_id,   # теперь передаём реальный OPK pub
                 "ciphertext": base64.b64encode(ct).decode(),
                 "header":     hdr,
             }

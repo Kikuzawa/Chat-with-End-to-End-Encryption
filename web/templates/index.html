@@ -1,121 +1,583 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SecureChat - E2EE</title>
-    <link rel="stylesheet" href="/static/style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SecureChat — E2EE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════
+   SecureChat — Light Glassmorphism Theme
+   ═══════════════════════════════════════════════ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --accent:         #3b82f6;
+  --accent-hover:   #2563eb;
+  --success:        #10b981;
+  --danger:         #ef4444;
+  --text-primary:   #1e293b;
+  --text-secondary: #64748b;
+  --text-tertiary:  #94a3b8;
+}
+
+body {
+  font-family: var(--font-sans);
+  height: 100vh;
+  overflow: hidden;
+  background: linear-gradient(135deg, #e0e7ff 0%, #f0f9ff 50%, #e0f2fe 100%);
+}
+
+/* ── Orbs ────────────────────────────────────── */
+body::before, body::after {
+  content: '';
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+}
+body::before {
+  width: 500px; height: 500px;
+  background: rgba(99, 102, 241, 0.10);
+  filter: blur(100px);
+  top: -10%; left: -5%;
+}
+body::after {
+  width: 400px; height: 400px;
+  background: rgba(59, 130, 246, 0.09);
+  filter: blur(80px);
+  bottom: -5%; right: 5%;
+}
+
+/* ── Screens ─────────────────────────────────── */
+.screen { display: none; height: 100vh; position: relative; z-index: 1; }
+.screen.active { display: flex; }
+
+/* ═══════════════════════════════════════════════
+   AUTH SCREEN
+   ═══════════════════════════════════════════════ */
+#auth-screen {
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-card {
+  width: 360px;
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.75);
+  border-radius: 20px;
+  padding: 36px;
+  box-shadow: 0 16px 48px rgba(31,38,135,0.14), inset 0 1px 0 rgba(255,255,255,0.90);
+}
+
+.logo {
+  text-align: center;
+  margin-bottom: 28px;
+}
+.logo .lock-icon { font-size: 40px; line-height: 1; margin-bottom: 10px; }
+.logo h1 {
+  font-size: 24px; font-weight: 700;
+  color: var(--text-primary); letter-spacing: -0.02em;
+}
+.logo .subtitle { font-size: 12px; color: var(--text-tertiary); margin-top: 4px; }
+
+/* Tabs */
+.tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(148,163,184,0.20);
+  margin-bottom: 22px;
+}
+.tab {
+  flex: 1; padding: 9px 0; background: none; border: none;
+  font-family: var(--font-sans); font-size: 13px; font-weight: 500;
+  cursor: pointer; color: var(--text-tertiary);
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: all 200ms cubic-bezier(0.4,0,0.2,1);
+}
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Auth forms */
+.auth-form { display: none; flex-direction: column; gap: 14px; }
+.auth-form.active { display: flex; }
+
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-group label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.form-group input {
+  font-family: var(--font-sans); font-size: 14px; color: var(--text-primary);
+  background: rgba(255,255,255,0.68);
+  border: 1px solid rgba(255,255,255,0.75);
+  border-radius: 10px; padding: 10px 14px; outline: none;
+  box-shadow: 0 1px 4px rgba(31,38,135,0.06);
+  transition: all 200ms cubic-bezier(0.4,0,0.2,1);
+}
+.form-group input::placeholder { color: var(--text-tertiary); }
+.form-group input:focus {
+  border-color: rgba(59,130,246,0.50);
+  background: rgba(255,255,255,0.90);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.12), 0 1px 4px rgba(31,38,135,0.06);
+}
+
+.btn-primary {
+  font-family: var(--font-sans); font-size: 14px; font-weight: 600;
+  background: var(--accent); color: white; border: none;
+  border-radius: 10px; padding: 12px; cursor: pointer;
+  box-shadow: 0 4px 16px rgba(59,130,246,0.28);
+  transition: all 200ms cubic-bezier(0.4,0,0.2,1);
+  margin-top: 4px;
+}
+.btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+.btn-primary:active { transform: none; }
+
+.error-message {
+  font-size: 12px; color: var(--danger);
+  text-align: center; min-height: 18px;
+}
+
+.protocol-badges {
+  display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;
+  margin-top: 18px;
+}
+.badge-mono {
+  display: inline-block;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+  background: rgba(59,130,246,0.08); color: var(--accent);
+  border: 1px solid rgba(59,130,246,0.18);
+  border-radius: 999px; padding: 3px 10px;
+}
+
+/* ═══════════════════════════════════════════════
+   CHAT SCREEN
+   ═══════════════════════════════════════════════ */
+#chat-screen { flex-direction: row; }
+
+/* ── Sidebar ──────────────────────────────────── */
+.sidebar {
+  width: 272px; flex-shrink: 0;
+  display: flex; flex-direction: column;
+  background: rgba(255,255,255,0.82);
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  border-right: 1px solid rgba(255,255,255,0.65);
+  box-shadow: 2px 0 24px rgba(31,38,135,0.07);
+}
+
+.sidebar-header {
+  padding: 20px 18px 14px;
+  border-bottom: 1px solid rgba(148,163,184,0.15);
+}
+.sidebar-title-row {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 14px;
+}
+.sidebar-title {
+  font-size: 17px; font-weight: 700;
+  color: var(--text-primary); letter-spacing: -0.01em;
+}
+.badge-e2ee {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  background: rgba(16,185,129,0.10); color: var(--success);
+  border: 1px solid rgba(16,185,129,0.25);
+  border-radius: 999px; padding: 3px 9px;
+}
+
+.user-info-panel {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(59,130,246,0.06); border-radius: 12px; padding: 10px 12px;
+}
+.avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6, #60a5fa);
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-weight: 700; font-size: 14px; flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.25);
+}
+.avatar.lg { width: 36px; height: 36px; font-size: 15px; }
+.user-details { display: flex; flex-direction: column; gap: 2px; }
+.user-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.user-status {
+  font-size: 11px; color: var(--success);
+  display: flex; align-items: center; gap: 4px;
+}
+.status-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--success);
+}
+
+/* Contacts list */
+.contacts-section {
+  flex: 1; overflow-y: auto; padding: 12px 10px 8px;
+}
+.contacts-label {
+  font-size: 10px; font-weight: 600; color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 0 6px 8px;
+}
+.contact-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 8px; border-radius: 10px; cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: all 150ms cubic-bezier(0.4,0,0.2,1);
+  margin-bottom: 2px;
+}
+.contact-item:hover { background: rgba(59,130,246,0.06); }
+.contact-item.active {
+  background: rgba(59,130,246,0.10);
+  border-left-color: var(--accent);
+  padding-left: 6px;
+}
+.contact-avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-weight: 700; font-size: 13px; flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+.contact-info { flex: 1; min-width: 0; }
+.contact-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.contact-online-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--success); flex-shrink: 0;
+}
+
+/* Add contact */
+.add-contact-row {
+  padding: 10px 12px;
+  border-top: 1px solid rgba(148,163,184,0.12);
+  display: flex; gap: 6px;
+}
+.add-contact-row input {
+  flex: 1; font-family: var(--font-sans); font-size: 13px; color: var(--text-primary);
+  background: rgba(255,255,255,0.65);
+  border: 1px solid rgba(255,255,255,0.72);
+  border-radius: 8px; padding: 8px 12px; outline: none;
+  transition: all 200ms;
+}
+.add-contact-row input:focus {
+  border-color: rgba(59,130,246,0.45);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.10);
+  background: rgba(255,255,255,0.90);
+}
+.add-contact-row input::placeholder { color: var(--text-tertiary); }
+.btn-add {
+  width: 34px; height: 34px; flex-shrink: 0; border: none;
+  border-radius: 8px; background: var(--accent); color: white;
+  font-size: 20px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.25);
+  transition: all 200ms;
+}
+.btn-add:hover { background: var(--accent-hover); }
+
+/* Sidebar footer */
+.sidebar-footer { padding: 8px 12px 16px; display: flex; flex-direction: column; gap: 6px; }
+
+.btn-diag {
+  width: 100%; padding: 7px; background: transparent;
+  border: 1px solid rgba(148,163,184,0.30); border-radius: 8px;
+  color: var(--text-tertiary); font-family: var(--font-sans);
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  transition: all 200ms;
+}
+.btn-diag:hover {
+  background: rgba(59,130,246,0.06);
+  border-color: rgba(59,130,246,0.30);
+  color: var(--accent);
+}
+
+.btn-logout {
+  width: 100%; padding: 8px; background: transparent;
+  border: 1px solid rgba(239,68,68,0.30); border-radius: 8px;
+  color: var(--danger); font-family: var(--font-sans);
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: all 200ms;
+}
+.btn-logout:hover { background: rgba(239,68,68,0.06); }
+.btn-logout svg { flex-shrink: 0; }
+
+/* ── Chat Area ────────────────────────────────── */
+.chat-area {
+  flex: 1; display: flex; flex-direction: column;
+  background: rgba(240,244,255,0.55); min-width: 0;
+}
+
+.chat-header {
+  padding: 14px 20px;
+  display: flex; align-items: center; gap: 12px;
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255,255,255,0.65);
+  box-shadow: 0 2px 16px rgba(31,38,135,0.06);
+  min-height: 64px;
+}
+.chat-header-info { flex: 1; min-width: 0; }
+.chat-partner-name { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+.chat-fingerprint {
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); margin-top: 1px;
+}
+.badge-session {
+  font-size: 11px; font-weight: 600;
+  background: rgba(16,185,129,0.10); color: var(--success);
+  border: 1px solid rgba(16,185,129,0.25);
+  border-radius: 999px; padding: 4px 10px;
+  white-space: nowrap;
+}
+
+/* Messages */
+.messages {
+  flex: 1; overflow-y: auto;
+  padding: 20px 20px 8px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+.welcome-message {
+  margin: auto; text-align: center;
+  color: var(--text-tertiary);
+}
+.welcome-icon { font-size: 48px; margin-bottom: 14px; }
+.welcome-message h3 { font-size: 17px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; }
+.welcome-message p { font-size: 13px; line-height: 1.6; }
+.welcome-badges { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+
+.message {
+  display: flex;
+  animation: fadeInMsg 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+@keyframes fadeInMsg {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.message.sent     { justify-content: flex-end; }
+.message.received { justify-content: flex-start; }
+.message.error-msg .msg-bubble { border: 1px solid rgba(239,68,68,0.35) !important; }
+
+.msg-bubble {
+  max-width: 68%; padding: 10px 14px;
+  font-size: 14px; line-height: 1.55;
+  font-family: var(--font-sans);
+}
+.message.sent .msg-bubble {
+  background: var(--accent); color: white;
+  border-radius: 14px 14px 4px 14px;
+  box-shadow: 0 2px 12px rgba(59,130,246,0.25);
+}
+.message.received .msg-bubble {
+  background: rgba(255,255,255,0.82); color: var(--text-primary);
+  border: 1px solid rgba(255,255,255,0.75);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-radius: 14px 14px 14px 4px;
+  box-shadow: 0 2px 12px rgba(31,38,135,0.07);
+}
+.msg-text { margin-bottom: 4px; word-break: break-word; }
+.msg-meta {
+  display: flex; gap: 4px; align-items: center;
+  font-size: 10px; opacity: 0.65;
+}
+.message.sent .msg-meta { justify-content: flex-end; }
+
+/* Input area */
+.message-input-area {
+  padding: 12px 16px 16px;
+  background: rgba(255,255,255,0.74);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255,255,255,0.65);
+}
+.input-row { display: flex; gap: 8px; align-items: center; }
+.input-row input {
+  flex: 1; font-family: var(--font-sans); font-size: 14px; color: var(--text-primary);
+  background: rgba(255,255,255,0.68);
+  border: 1px solid rgba(255,255,255,0.75);
+  border-radius: 12px; padding: 11px 14px; outline: none;
+  box-shadow: 0 1px 4px rgba(31,38,135,0.06);
+  transition: all 200ms cubic-bezier(0.4,0,0.2,1);
+}
+.input-row input:focus {
+  border-color: rgba(59,130,246,0.50);
+  background: rgba(255,255,255,0.92);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.12), 0 1px 4px rgba(31,38,135,0.06);
+}
+.input-row input::placeholder { color: var(--text-tertiary); }
+.input-row input:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-send {
+  width: 42px; height: 42px; flex-shrink: 0;
+  border: none; border-radius: 10px;
+  background: var(--accent); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 10px rgba(59,130,246,0.30);
+  transition: all 200ms cubic-bezier(0.4,0,0.2,1);
+}
+.btn-send:hover:not(:disabled) { background: var(--accent-hover); transform: scale(1.05); }
+.btn-send:disabled { opacity: 0.40; cursor: not-allowed; transform: none; }
+.btn-send svg { display: block; }
+
+.encrypt-hint {
+  text-align: right; margin-top: 5px;
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);
+  min-height: 14px;
+}
+
+/* ── Scrollbars ──────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.35); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.55); }
+
+/* ── Loader overlay ──────────────────────────── */
+#loader {
+  position: fixed; inset: 0; z-index: 100;
+  background: linear-gradient(135deg, #e0e7ff 0%, #f0f9ff 50%, #e0f2fe 100%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; transition: opacity 400ms;
+}
+#loader .lock { font-size: 40px; }
+#loader p { font-size: 13px; color: var(--text-tertiary); font-family: var(--font-sans); }
+#loader.hidden { opacity: 0; pointer-events: none; }
+</style>
 </head>
 <body>
-    <!-- Экран авторизации -->
-    <div id="auth-screen" class="screen active">
-        <div class="auth-container">
-            <div class="logo">
-                <div class="lock-icon">&#128274;</div>
-                <h1>SecureChat</h1>
-                <p class="subtitle">End-to-End Encrypted</p>
-            </div>
-            
-            <div class="tabs">
-                <button class="tab active" id="tab-login">Вход</button>
-                <button class="tab" id="tab-register">Регистрация</button>
-            </div>
-            
-            <!-- Форма входа -->
-            <form id="login-form" class="auth-form active">
-                <div class="form-group">
-                    <label for="login-username">Имя пользователя</label>
-                    <input type="text" id="login-username" placeholder="alice" required autocomplete="off">
-                </div>
-                <div class="form-group">
-                    <label for="login-password">Пароль</label>
-                    <input type="password" id="login-password" placeholder="••••••••" required>
-                </div>
-                <button type="submit" class="btn btn-primary">Войти</button>
-            </form>
-            
-            <!-- Форма регистрации -->
-            <form id="register-form" class="auth-form">
-                <div class="form-group">
-                    <label for="register-username">Имя пользователя</label>
-                    <input type="text" id="register-username" placeholder="alice" required autocomplete="off">
-                </div>
-                <div class="form-group">
-                    <label for="register-password">Пароль</label>
-                    <input type="password" id="register-password" placeholder="••••••••" required>
-                </div>
-                <button type="submit" class="btn btn-primary">Зарегистрироваться</button>
-            </form>
-            
-            <div id="auth-error" class="error-message"></div>
-        </div>
+
+<!-- Loading overlay -->
+<div id="loader">
+  <div class="lock">🔐</div>
+  <p>Загрузка SecureChat…</p>
+</div>
+
+<!-- ── AUTH SCREEN ────────────────────────────── -->
+<div id="auth-screen" class="screen">
+  <div class="auth-card">
+    <div class="logo">
+      <div class="lock-icon">🔐</div>
+      <h1>SecureChat</h1>
+      <p class="subtitle">End-to-End Encrypted</p>
     </div>
-    
-    <!-- Экран чата -->
-    <div id="chat-screen" class="screen">
-        <div class="chat-container">
-            <!-- Боковая панель -->
-            <div class="sidebar">
-                <div class="sidebar-header">
-                    <h2>SecureChat</h2>
-                    <span class="status-badge encrypted">E2EE</span>
-                </div>
-                
-                <div class="user-info">
-                    <div class="avatar" id="user-avatar">?</div>
-                    <div class="user-details">
-                        <span id="current-username">username</span>
-                        <span class="user-status online">online</span>
-                    </div>
-                </div>
-                
-                <div class="contacts">
-                    <h3>Контакты</h3>
-                    <div id="contacts-list"></div>
-                    <div class="add-contact">
-                        <input type="text" id="contact-input" placeholder="Добавить контакт..." autocomplete="off">
-                        <button id="add-contact-btn">+</button>
-                    </div>
-                </div>
-                
-                <button class="btn btn-logout" id="logout-btn">Выйти</button>
-            </div>
-            
-            <!-- Область чата -->
-            <div class="chat-area">
-                <div class="chat-header">
-                    <div class="chat-contact-info">
-                        <span class="contact-name" id="chat-partner">Выберите контакт</span>
-                        <span class="fingerprint" id="fingerprint-display"></span>
-                    </div>
-                </div>
-                
-                <div class="messages" id="messages-container">
-                    <div class="welcome-message">
-                        <div class="welcome-icon">&#128274;</div>
-                        <h3>Защищённый чат</h3>
-                        <p>Все сообщения шифруются end-to-end</p>
-                        <p class="protocol-info">X3DH + Double Ratchet + AES-256-GCM</p>
-                    </div>
-                </div>
-                
-                <div class="message-input-area">
-                    <div class="input-container">
-                        <input 
-                            type="text" 
-                            id="message-input" 
-                            placeholder="Введите сообщение..." 
-                            disabled
-                            autocomplete="off"
-                        >
-                        <button class="btn btn-send" id="send-button" disabled>Send</button>
-                    </div>
-                </div>
-            </div>
-        </div>
+
+    <div class="tabs">
+      <button class="tab active" id="tab-login">Вход</button>
+      <button class="tab" id="tab-register">Регистрация</button>
     </div>
-    
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    <script src="/static/chat.js"></script>
+
+    <form id="login-form" class="auth-form active">
+      <div class="form-group">
+        <label for="login-username">Имя пользователя</label>
+        <input type="text" id="login-username" placeholder="alice" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="login-password">Пароль</label>
+        <input type="password" id="login-password" placeholder="••••••••">
+      </div>
+      <button type="submit" class="btn-primary">Войти</button>
+    </form>
+
+    <form id="register-form" class="auth-form">
+      <div class="form-group">
+        <label for="register-username">Имя пользователя</label>
+        <input type="text" id="register-username" placeholder="alice" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="register-password">Пароль</label>
+        <input type="password" id="register-password" placeholder="••••••••">
+      </div>
+      <button type="submit" class="btn-primary">Зарегистрироваться</button>
+    </form>
+
+    <div id="auth-error" class="error-message"></div>
+
+    <div class="protocol-badges">
+      <span class="badge-mono">X3DH</span>
+      <span class="badge-mono">Double Ratchet</span>
+      <span class="badge-mono">AES-256-GCM</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── CHAT SCREEN ────────────────────────────── -->
+<div id="chat-screen" class="screen">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title-row">
+        <span class="sidebar-title">SecureChat</span>
+        <span class="badge-e2ee">E2EE</span>
+      </div>
+      <div class="user-info-panel">
+        <div class="avatar lg" id="user-avatar">?</div>
+        <div class="user-details">
+          <span class="user-name" id="current-username">username</span>
+          <span class="user-status">
+            <span class="status-dot"></span>online
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="contacts-section">
+      <div class="contacts-label">Контакты</div>
+      <div id="contacts-list"></div>
+    </div>
+
+    <div class="add-contact-row">
+      <input type="text" id="contact-input" placeholder="Добавить контакт…" autocomplete="off">
+      <button class="btn-add" id="add-contact-btn">+</button>
+    </div>
+
+    <div class="sidebar-footer">
+      <button class="btn-diag" id="logs-btn">
+        &#128202; Диагностика / Логи
+      </button>
+      <button class="btn-logout" id="logout-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+          <polyline points="16 17 21 12 16 7"></polyline>
+          <line x1="21" y1="12" x2="9" y2="12"></line>
+        </svg>
+        Выйти
+      </button>
+    </div>
+  </div>
+
+  <!-- Chat area -->
+  <div class="chat-area">
+    <div class="chat-header" id="chat-header">
+      <div style="font-size:15px;color:var(--text-tertiary)">Выберите контакт</div>
+    </div>
+
+    <div class="messages" id="messages-container">
+      <div class="welcome-message">
+        <div class="welcome-icon">🔐</div>
+        <h3>Защищённый чат</h3>
+        <p>Все сообщения шифруются end-to-end</p>
+        <div class="welcome-badges">
+          <span class="badge-mono">X3DH</span>
+          <span class="badge-mono">Double Ratchet</span>
+          <span class="badge-mono">AES-256-GCM</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="message-input-area">
+      <div class="input-row">
+        <input type="text" id="message-input" placeholder="Введите сообщение…" disabled autocomplete="off">
+        <button class="btn-send" id="send-button" disabled>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+      <div class="encrypt-hint" id="encrypt-hint"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script src="/static/chat.js"></script>
 </body>
 </html>
