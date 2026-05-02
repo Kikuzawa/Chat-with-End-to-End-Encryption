@@ -337,26 +337,28 @@ def handle_login(data):
         emit('login_response', {'error': 'Заполните все поля'})
         return
 
-    needs_bundle_update = False
-    if username not in _users:
-        km, keys_from_disk = _load_or_create_km(username)
-        _users[username] = UserState(km=km, ws=None, sid=request.sid)
-        needs_bundle_update = not keys_from_disk
-
     sid = request.sid
 
     async def do_login():
+        # Always evaluate key state inside the coroutine — avoids stale outer-scope
+        # flags from earlier failed or ghost login attempts.
+        km, keys_from_disk = _load_or_create_km(username)
+        if username not in _users or _users[username].ws is None:
+            _users[username] = UserState(km=km, ws=None, sid=sid)
+        else:
+            _users[username].km = km
+
         st = await _connect_and_login(username, password, sid)
-        if needs_bundle_update:
-            km = st.km
+
+        if not keys_from_disk:
+            logger.info(f"No key file for {username} — pushing fresh bundle to KDS")
             await st.ws.send(json.dumps({
                 "type": "update_bundle",
-                "bundle": km.export_bundle(),
+                "bundle": st.km.export_bundle(),
             }))
             resp = await _ws_recv(st, timeout=10)
             if resp.get("status") == "ok":
-                km.save_keys(username)
-                # Invalidate any sessions that used the old keys
+                st.km.save_keys(username)
                 for k in [k for k in _sessions if username in k]:
                     del _sessions[k]
                 logger.info(f"Updated KDS bundle and saved new keys for {username}")
