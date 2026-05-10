@@ -26,10 +26,11 @@
             background: white;
             border-right: 2px solid #ddd;
         }
-        .diagram-section .mermaid {
-            display: flex;
-            justify-content: center;
-            min-width: fit-content;
+        .diagram-section svg {
+            display: block;
+            margin: 0 auto;
+            max-width: 100%;
+            height: auto;
         }
         .logs-section {
             width: 420px;
@@ -61,14 +62,6 @@
             color: #888;
             text-align: center;
             padding: 50px 20px;
-        }
-        .block-clickable {
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .block-clickable:hover {
-            opacity: 0.7;
-            filter: drop-shadow(0 0 8px #3498db);
         }
         .key-value {
             background: #2a2a2a;
@@ -150,20 +143,8 @@
 </head>
 <body>
     <div class="container">
-        <div class="diagram-section">
-            <div class="mermaid" id="flowchart">
-            </div>
-        </div>
-        <div class="logs-section">
-            <div class="logs-header">📋 Логи операции</div>
-            <div class="logs-content" id="logs-content">
-                <div class="logs-empty">Нажмите на блок диаграммы</div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        const diagramDef = `
+        <div class="diagram-section" id="diagram-section">
+            <div class="mermaid">
 graph TD
     A["<b>1.0 НАЧАЛО</b><br/>Инициализация"] -->|client| B["<b>1.1</b> Web UI/CLI"]
     B --> C["<b>1.2</b> Подключение<br/>к серверу WSS"]
@@ -173,7 +154,6 @@ graph TD
     E -->|НЕТ| F["<b>2.0 ВХОД</b>"]
     E -->|ДА| G["<b>3.0 РЕГИСТРАЦИЯ</b>"]
 
-    %% === ВХОД ===
     F --> F1["<b>2.1</b> Ввод<br/>username, password"]
     F1 --> F2["<b>2.2</b> WSS login<br/>на сервер"]
     F2 --> F3["<b>2.3</b> Проверка<br/>PBKDF2-SHA256"]
@@ -182,25 +162,21 @@ graph TD
     F5 --> F1
     F4 -->|ДА| F6["<b>2.6</b> Загрузка<br/>контактов Redis"]
 
-    %% === РЕГИСТРАЦИЯ ===
     G --> G1["<b>3.1</b> Ввод<br/>username, password"]
     G1 --> G2["<b>3.2</b> Генерация ключей<br/>IK, SPK, OPK"]
     G2 --> G3["<b>3.3</b> Загрузка bundle<br/>в KDS HTTPS"]
     G3 --> G4["<b>3.4</b> WSS register<br/>на сервер"]
     G4 --> G5["<b>3.5</b> Сохранение<br/>ключей на диск"]
 
-    %% Слияние потоков
     F6 --> H["<b>4.0</b> Интерфейс чата"]
     G5 --> H
 
-    %% === ГЛАВНЫЙ ЦИКЛ ===
     H --> I["<b>5.0</b> Выбор действия"]
     I --> J{<b>5.1</b><br/>Отправить<br/>сообщение?}
 
     J -->|НЕТ| K["<b>5.7</b> Ожидание<br/>входящих WSS"]
     J -->|ДА| L["<b>5.2</b> Выбор получателя<br/>+ ввод текста"]
 
-    %% === ОТПРАВКА ===
     L --> L1["<b>5.3</b> Запрос bundle<br/>получателя у KDS"]
     L1 --> L2{<b>5.4</b><br/>Сессия<br/>существует?}
     L2 -->|НЕТ| L3["<b>5.5</b> X3DH initiate<br/>DH1, DH2, DH3, DH4"]
@@ -208,7 +184,6 @@ graph TD
     L4 --> L5["<b>5.7</b> Отправка<br/>на сервер WSS"]
     L2 -->|ДА| L4
 
-    %% === ПОЛУЧЕНИЕ ===
     K --> R1["<b>6.0</b> Получено<br/>с сервера WSS"]
     R1 --> R2["<b>6.1</b> Проверка<br/>отправителя"]
     R2 --> R3{<b>6.2</b><br/>Сессия<br/>существует?}
@@ -221,7 +196,6 @@ graph TD
     L5 --> I
     R7 --> I
 
-    %% === ВЫХОД ===
     I --> X{<b>7.0</b><br/>Выход?}
     X -->|НЕТ| I
     X -->|ДА| Y["<b>7.1</b> Выход<br/>пользователя"]
@@ -234,39 +208,43 @@ graph TD
     style G fill:#e8ffe8
     style H fill:#fff9e6
     style I fill:#fff9e6
-    style L5 fill:#fff0e6
-    style R7 fill:#e6f3ff
-        `;
+            </div>
+        </div>
+        <div class="logs-section">
+            <div class="logs-header">📋 Логи операции</div>
+            <div class="logs-content" id="logs-content">
+                <div class="logs-empty">Нажмите на блок диаграммы</div>
+            </div>
+        </div>
+    </div>
 
+    <script>
         mermaid.initialize({ startOnLoad: true, theme: 'default' });
-        document.getElementById('flowchart').innerHTML = diagramDef;
-        mermaid.render('flowchart', diagramDef).then(({ svg }) => {
-            document.getElementById('flowchart').innerHTML = svg;
-            attachEventListeners();
-        });
+        mermaid.contentLoaded();
 
         const logsContent = document.getElementById('logs-content');
+        const diagramSection = document.getElementById('diagram-section');
+
+        // Ожидаем загрузки диаграммы и добавляем обработчики
+        setTimeout(() => {
+            attachEventListeners();
+        }, 500);
 
         function attachEventListeners() {
-            // Ищем все текстовые элементы в SVG
-            const textElements = document.querySelectorAll('#flowchart text');
-            textElements.forEach(el => {
-                const text = el.textContent;
-                const match = text.match(/^<b>(\d+\.\d+)<\/b>/);
+            // Ищем все SVG rect элементы с текстом
+            const rects = diagramSection.querySelectorAll('g[id]');
+            rects.forEach(g => {
+                const text = g.textContent;
+                const match = text.match(/(\d+\.\d+)/);
                 if (match) {
                     const stepId = match[1];
-                    const rect = el.closest('g')?.querySelector('rect');
-                    if (rect) {
-                        rect.style.cursor = 'pointer';
-                        rect.addEventListener('click', () => loadStepLogs(stepId));
-                        rect.addEventListener('mouseenter', () => {
-                            rect.style.opacity = '0.7';
-                            loadStepLogs(stepId);
-                        });
-                        rect.addEventListener('mouseleave', () => {
-                            rect.style.opacity = '1';
-                        });
-                    }
+                    g.style.cursor = 'pointer';
+                    g.addEventListener('click', () => {
+                        loadStepLogs(stepId);
+                    });
+                    g.addEventListener('mouseenter', () => {
+                        loadStepLogs(stepId);
+                    });
                 }
             });
         }
