@@ -40,11 +40,27 @@
             border-left: 2px solid #ddd;
         }
         .logs-header {
-            padding: 15px;
+            padding: 12px 15px;
             background: #2c3e50;
             color: white;
             font-weight: bold;
             border-bottom: 2px solid #ddd;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .btn-clear {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .btn-clear:hover {
+            background: #c0392b;
         }
         .logs-content {
             flex: 1;
@@ -211,7 +227,10 @@ graph TD
             </div>
         </div>
         <div class="logs-section">
-            <div class="logs-header">📋 Логи операции</div>
+            <div class="logs-header">
+                <span>📋 Логи операции</span>
+                <button class="btn-clear" id="clear-btn">🗑 Очистить логи</button>
+            </div>
             <div class="logs-content" id="logs-content">
                 <div class="logs-empty">Нажмите на блок диаграммы</div>
             </div>
@@ -221,6 +240,21 @@ graph TD
     <script>
         mermaid.initialize({ startOnLoad: true, theme: 'default' });
         mermaid.contentLoaded();
+
+        document.getElementById('clear-btn').addEventListener('click', () => {
+            if (!confirm('Очистить все лог-файлы? Данные в диаграмме обнулятся.')) return;
+            fetch('/api/flowchart/clear', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    const msg = data.cleared.length
+                        ? `✓ Очищено: ${data.cleared.join(', ')}`
+                        : `❌ Ошибки: ${data.errors.join(', ')}`;
+                    logsContent.innerHTML = `<div class="logs-empty">${msg}<br><br>Войдите в чат и совершите действия — логи обновятся.</div>`;
+                })
+                .catch(err => {
+                    logsContent.innerHTML = `<div class="logs-empty">❌ Ошибка: ${err.message}</div>`;
+                });
+        });
 
         const logsContent = document.getElementById('logs-content');
         const diagramSection = document.getElementById('diagram-section');

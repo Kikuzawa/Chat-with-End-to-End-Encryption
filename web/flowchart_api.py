@@ -153,6 +153,25 @@ STEP_INFO = {
     }
 }
 
+def clear_logs() -> dict:
+    """Очищает все лог-файлы."""
+    log_files = [
+        os.path.join(LOG_DIR, "crypto.log"),
+        os.path.join(LOG_DIR, "webapp.log"),
+        os.path.join(LOG_DIR, "server.log"),
+    ]
+    cleared = []
+    errors = []
+    for path in log_files:
+        try:
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write("")
+            cleared.append(os.path.basename(path))
+        except Exception as e:
+            errors.append(f"{os.path.basename(path)}: {e}")
+    return {"cleared": cleared, "errors": errors}
+
+
 def get_step_logs(step_id: str) -> dict:
     """Получает логи для конкретного шага."""
     info = STEP_INFO.get(step_id, {
