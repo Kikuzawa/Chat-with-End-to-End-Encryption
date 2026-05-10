@@ -295,6 +295,31 @@ body {
     font-weight: 700;
 }
 
+.sidebar-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.btn-logs {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 0.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    transition: all 0.2s;
+    text-align: left;
+}
+
+.btn-logs:hover {
+    background: rgba(0, 212, 170, 0.08);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
 .btn-logout {
     width: 100%;
     background: transparent;

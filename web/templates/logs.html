@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureChat — Диагностика</title>
+    <style>
+        :root {
+            --bg:      #0f0f1a;
+            --panel:   #1a1a2e;
+            --border:  #2a2a4a;
+            --text:    #e0e0e0;
+            --muted:   #6a6a8a;
+            --accent:  #00d4aa;
+            --info:    #00a8ff;
+            --warn:    #ffa502;
+            --error:   #ff4757;
+            --debug:   #7f8fa6;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── Заголовок ── */
+        header {
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        header h1 {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: 0.03em;
+        }
+        .header-badge {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.55rem;
+            border-radius: 10px;
+            background: rgba(0,212,170,.12);
+            color: var(--accent);
+        }
+
+        /* ── Панель управления ── */
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex: 1;
+            flex-wrap: wrap;
+        }
+        .toolbar input[type=text] {
+            flex: 1;
+            min-width: 160px;
+            padding: 0.4rem 0.75rem;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-size: 0.82rem;
+        }
+        .toolbar input:focus { outline: none; border-color: var(--accent); }
+
+        .btn-tool {
+            padding: 0.4rem 0.85rem;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all .15s;
+            white-space: nowrap;
+        }
+        .btn-tool:hover       { border-color: var(--accent); color: var(--accent); }
+        .btn-tool.active      { background: rgba(0,212,170,.12); border-color: var(--accent); color: var(--accent); }
+        .btn-tool.danger      { border-color: var(--error); color: var(--error); }
+        .btn-tool.danger:hover{ background: rgba(255,71,87,.1); }
+
+        .level-filter { display: flex; gap: 0.4rem; }
+        .level-btn {
+            padding: 0.3rem 0.65rem;
+            border-radius: 5px;
+            border: 1px solid var(--border);
+            background: transparent;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all .15s;
+            color: var(--muted);
+        }
+        .level-btn[data-level=DEBUG]   { --c: var(--debug); }
+        .level-btn[data-level=INFO]    { --c: var(--info);  }
+        .level-btn[data-level=WARNING] { --c: var(--warn);  }
+        .level-btn[data-level=ERROR],
+        .level-btn[data-level=CRITICAL]{ --c: var(--error); }
+        .level-btn.on { border-color: var(--c); color: var(--c); background: rgba(0,0,0,.25); }
+
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+            animation: pulse 1.5s infinite;
+            flex-shrink: 0;
+        }
+        .status-dot.paused { background: var(--warn); animation: none; }
+        @keyframes pulse {
+            0%,100% { opacity: 1; }
+            50%      { opacity: .35; }
+        }
+
+        /* ── Лог-таблица ── */
+        .log-wrap {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.5rem 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+        }
+        thead th {
+            position: sticky;
+            top: 0;
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+            padding: 0.4rem 0.75rem;
+            text-align: left;
+            color: var(--muted);
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+        tbody tr { transition: background .1s; }
+        tbody tr:hover { background: rgba(255,255,255,.03); }
+        td { padding: 0.3rem 0.75rem; vertical-align: top; border-bottom: 1px solid rgba(42,42,74,.5); }
+
+        .col-time  { color: var(--muted); white-space: nowrap; width: 72px; }
+        .col-level { white-space: nowrap; width: 68px; }
+        .col-name  { color: var(--muted); white-space: nowrap; width: 120px; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+        .col-msg   { word-break: break-word; }
+
+        .lvl-DEBUG    { color: var(--debug); }
+        .lvl-INFO     { color: var(--info);  }
+        .lvl-WARNING  { color: var(--warn);  }
+        .lvl-ERROR    { color: var(--error); font-weight: 600; }
+        .lvl-CRITICAL { color: var(--error); font-weight: 700; }
+
+        tr.lvl-row-ERROR    td { background: rgba(255,71,87,.05); }
+        tr.lvl-row-CRITICAL td { background: rgba(255,71,87,.1); }
+        tr.lvl-row-WARNING  td { background: rgba(255,165,2,.04); }
+
+        .highlight { background: rgba(255,211,0,.18) !important; }
+
+        /* ── Пустой стейт ── */
+        .empty {
+            text-align: center;
+            color: var(--muted);
+            padding: 3rem;
+            font-size: 0.9rem;
+        }
+
+        /* ── Нижняя строка статуса ── */
+        footer {
+            background: var(--panel);
+            border-top: 1px solid var(--border);
+            padding: 0.35rem 1.5rem;
+            font-size: 0.72rem;
+            color: var(--muted);
+            display: flex;
+            gap: 1.5rem;
+        }
+        footer span b { color: var(--text); }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>&#128202; SecureChat — Диагностика</h1>
+    <span class="header-badge">Live Logs</span>
+    <span class="status-dot" id="status-dot"></span>
+    <div class="toolbar">
+        <input type="text" id="search-input" placeholder="Фильтр по тексту..." oninput="applyFilter()">
+        <div class="level-filter" id="level-filter"></div>
+        <button class="btn-tool" id="pause-btn" onclick="togglePause()">⏸ Пауза</button>
+        <button class="btn-tool" onclick="scrollToBottom()">&#8595; В конец</button>
+        <button class="btn-tool danger" onclick="clearLogs()">&#128465; Очистить</button>
+        <button class="btn-tool" onclick="window.location.href='/'">&#8592; Чат</button>
+    </div>
+</header>
+
+<div class="log-wrap" id="log-wrap">
+    <table id="log-table">
+        <thead>
+            <tr>
+                <th class="col-time">Время</th>
+                <th class="col-level">Уровень</th>
+                <th class="col-name">Модуль</th>
+                <th class="col-msg">Сообщение</th>
+            </tr>
+        </thead>
+        <tbody id="log-body"></tbody>
+    </table>
+    <div class="empty" id="empty-msg" style="display:none">Нет записей. Ожидаем логи...</div>
+</div>
+
+<footer>
+    <span>Записей: <b id="stat-total">0</b></span>
+    <span>Показано: <b id="stat-shown">0</b></span>
+    <span>ERROR: <b id="stat-error" style="color:var(--error)">0</b></span>
+    <span>WARNING: <b id="stat-warn" style="color:var(--warn)">0</b></span>
+    <span id="stat-paused" style="display:none;color:var(--warn)">&#9646;&#9646; Пауза</span>
+</footer>
+
+<script>
+var POLL_MS   = 1000;
+var MAX_ROWS  = 2000;   // максимум строк в DOM
+
+var _since    = 0;
+var _paused   = false;
+var _allRows  = [];     // все записи [{time,level,name,msg,el}]
+var _timerId  = null;
+
+var LEVELS = ['DEBUG','INFO','WARNING','ERROR','CRITICAL'];
+var _activeLevels = new Set(LEVELS);
+
+// ── Инициализация ─────────────────────────────────────────────────────────────
+
+(function init() {
+    var filt = document.getElementById('level-filter');
+    LEVELS.forEach(function(l) {
+        var b = document.createElement('button');
+        b.className = 'level-btn on';
+        b.dataset.level = l;
+        b.textContent = l;
+        b.onclick = function() { toggleLevel(l, b); };
+        filt.appendChild(b);
+    });
+    schedulePoll();
+})();
+
+function schedulePoll() {
+    _timerId = setTimeout(poll, POLL_MS);
+}
+
+// ── Получение логов ───────────────────────────────────────────────────────────
+
+function poll() {
+    if (_paused) { schedulePoll(); return; }
+    fetch('/api/logs?since=' + _since)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            setConnected(true);
+            if (data.logs && data.logs.length) {
+                data.logs.forEach(addRow);
+                _since = data.total;
+                updateStats();
+                if (isNearBottom()) { scrollToBottom(); }
+            }
+        })
+        .catch(function() { setConnected(false); })
+        .finally(schedulePoll);
+}
+
+// ── Строки ────────────────────────────────────────────────────────────────────
+
+function addRow(rec) {
+    var tr = document.createElement('tr');
+    tr.className = 'lvl-row-' + rec.level;
+
+    tr.innerHTML =
+        '<td class="col-time">'  + esc(rec.time)  + '</td>' +
+        '<td class="col-level lvl-' + rec.level + '">' + esc(rec.level) + '</td>' +
+        '<td class="col-name" title="' + esc(rec.name) + '">' + esc(rec.name) + '</td>' +
+        '<td class="col-msg">'   + esc(rec.msg)   + '</td>';
+
+    var entry = { level: rec.level, name: rec.name, msg: rec.msg, el: tr };
+    _allRows.push(entry);
+
+    // Обрезаем старые строки если DOM переполнен
+    if (_allRows.length > MAX_ROWS) {
+        var old = _allRows.shift();
+        if (old.el.parentNode) { old.el.parentNode.removeChild(old.el); }
+    }
+
+    applyFilterToRow(entry);
+    document.getElementById('log-body').appendChild(tr);
+    document.getElementById('empty-msg').style.display = 'none';
+    document.getElementById('log-table').style.display = '';
+}
+
+// ── Фильтрация ────────────────────────────────────────────────────────────────
+
+function applyFilter() {
+    var q = document.getElementById('search-input').value.toLowerCase();
+    var shown = 0;
+    _allRows.forEach(function(entry) {
+        var match = _activeLevels.has(entry.level) &&
+                    (!q || entry.msg.toLowerCase().includes(q) || entry.name.toLowerCase().includes(q));
+        entry.el.style.display = match ? '' : 'none';
+        if (match) {
+            shown++;
+            // Подсветка
+            var td = entry.el.querySelector('.col-msg');
+            if (q) {
+                td.innerHTML = esc(entry.msg).replace(
+                    new RegExp('(' + escRe(q) + ')', 'gi'),
+                    '<mark class="highlight">$1</mark>'
+                );
+            } else {
+                td.textContent = entry.msg;
+            }
+        }
+    });
+    document.getElementById('stat-shown').textContent = shown;
+    var isEmpty = _allRows.length === 0;
+    document.getElementById('empty-msg').style.display = isEmpty ? '' : 'none';
+    document.getElementById('log-table').style.display = isEmpty ? 'none' : '';
+}
+
+function applyFilterToRow(entry) {
+    var q = document.getElementById('search-input').value.toLowerCase();
+    var match = _activeLevels.has(entry.level) &&
+                (!q || entry.msg.toLowerCase().includes(q) || entry.name.toLowerCase().includes(q));
+    entry.el.style.display = match ? '' : 'none';
+}
+
+function toggleLevel(level, btn) {
+    if (_activeLevels.has(level)) {
+        _activeLevels.delete(level);
+        btn.classList.remove('on');
+    } else {
+        _activeLevels.add(level);
+        btn.classList.add('on');
+    }
+    applyFilter();
+}
+
+// ── Управление ────────────────────────────────────────────────────────────────
+
+function togglePause() {
+    _paused = !_paused;
+    var btn = document.getElementById('pause-btn');
+    var dot = document.getElementById('status-dot');
+    var sp  = document.getElementById('stat-paused');
+    if (_paused) {
+        btn.textContent = '▶ Продолжить';
+        btn.classList.add('active');
+        dot.classList.add('paused');
+        sp.style.display = '';
+    } else {
+        btn.textContent = '⏸ Пауза';
+        btn.classList.remove('active');
+        dot.classList.remove('paused');
+        sp.style.display = 'none';
+    }
+}
+
+function clearLogs() {
+    _allRows = [];
+    document.getElementById('log-body').innerHTML = '';
+    document.getElementById('empty-msg').style.display = '';
+    document.getElementById('log-table').style.display = 'none';
+    updateStats();
+}
+
+function scrollToBottom() {
+    var wrap = document.getElementById('log-wrap');
+    wrap.scrollTop = wrap.scrollHeight;
+}
+
+function isNearBottom() {
+    var wrap = document.getElementById('log-wrap');
+    return wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 120;
+}
+
+function setConnected(ok) {
+    var dot = document.getElementById('status-dot');
+    if (!_paused) {
+        dot.style.background = ok ? 'var(--accent)' : 'var(--error)';
+    }
+}
+
+function updateStats() {
+    var total  = _allRows.length;
+    var errors = _allRows.filter(function(r){ return r.level === 'ERROR' || r.level === 'CRITICAL'; }).length;
+    var warns  = _allRows.filter(function(r){ return r.level === 'WARNING'; }).length;
+    var shown  = _allRows.filter(function(r){ return r.el.style.display !== 'none'; }).length;
+    document.getElementById('stat-total').textContent = total;
+    document.getElementById('stat-shown').textContent = shown;
+    document.getElementById('stat-error').textContent = errors;
+    document.getElementById('stat-warn').textContent  = warns;
+}
+
+// ── Утилиты ───────────────────────────────────────────────────────────────────
+
+function esc(s) {
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function escRe(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+</script>
+</body>
+</html>
