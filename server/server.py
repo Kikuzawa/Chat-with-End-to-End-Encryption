@@ -162,6 +162,21 @@ async def websocket_endpoint(ws: WebSocket):
                 await ws.send_json({"type": "login", "status": "ok", "token": token})
                 await deliver_offline_messages(username, ws)
 
+            elif msg_type == "update_bundle":
+                if not auth_token:
+                    await ws.send_json({"type": "error", "message": "Not authenticated"})
+                    continue
+                bundle = msg.get("bundle")
+                if not bundle:
+                    await ws.send_json({"type": "error", "message": "Bundle required"})
+                    continue
+                try:
+                    await kds_upload_bundle(username, bundle)
+                    print(f"Bundle updated for {username}")
+                    await ws.send_json({"type": "update_bundle", "status": "ok"})
+                except Exception as e:
+                    await ws.send_json({"type": "error", "message": f"Bundle update failed: {e}"})
+
             elif msg_type == "get_bundle":
                 if not auth_token:
                     await ws.send_json({"type": "error", "message": "Not authenticated"})

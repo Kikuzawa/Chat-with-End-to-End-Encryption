@@ -2,7 +2,7 @@ services:
   redis:
     image: redis:7-alpine
     networks:
-      - internal
+      - chatnet
     volumes:
       - redis_data:/data
     healthcheck:
@@ -13,12 +13,12 @@ services:
     restart: always
 
   kds:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile.kds
     command: uvicorn server.kds:app --host 0.0.0.0 --port 8001
     networks:
-      - internal
+      - chatnet
     environment:
       - REDIS_URL=redis://redis:6379
       - KDS_API_KEY=internal-secret-key
@@ -36,15 +36,14 @@ services:
     restart: always
 
   message-server:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile.server
     command: uvicorn server.server:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
     networks:
-      - public
-      - internal
+      - chatnet
     environment:
       - REDIS_URL=redis://redis:6379
       - KDS_API_KEY=internal-secret-key
@@ -63,13 +62,34 @@ services:
       retries: 3
     restart: always
 
+  webapp:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    command: python web/webapp.py
+    ports:
+      - "5000:5000"
+    networks:
+      - chatnet
+    environment:
+      - SERVER_URL=ws://message-server:8000/ws
+      - KEY_DIR=/app/webapp_keys
+    volumes:
+      - webapp_keys:/app/webapp_keys
+    depends_on:
+      message-server:
+        condition: service_healthy
+    restart: always
+
 networks:
-  internal:
-    internal: true
-  public:
+  chatnet:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
 
 volumes:
   redis_data:
   server_keys:
   server_logs:
+  webapp_keys:
