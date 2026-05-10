@@ -74,8 +74,10 @@ services:
     environment:
       - SERVER_URL=ws://message-server:8000/ws
       - KEY_DIR=/app/webapp_keys
+      - LOG_DIR=/app/logs
     volumes:
       - webapp_keys:/app/webapp_keys
+      - server_logs:/app/logs
     depends_on:
       message-server:
         condition: service_healthy
