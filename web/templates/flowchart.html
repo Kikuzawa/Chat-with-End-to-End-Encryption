@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Алгоритм E2EE чата - Интерактивная визуализация</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -20,13 +21,18 @@
         }
         .diagram-section {
             flex: 1;
-            overflow-y: auto;
+            overflow: auto;
             padding: 20px;
             background: white;
             border-right: 2px solid #ddd;
         }
+        .diagram-section .mermaid {
+            display: flex;
+            justify-content: center;
+            min-width: fit-content;
+        }
         .logs-section {
-            width: 400px;
+            width: 420px;
             background: #f9f9f9;
             display: flex;
             flex-direction: column;
@@ -44,8 +50,8 @@
             overflow-y: auto;
             padding: 15px;
             font-family: 'Courier New', monospace;
-            font-size: 12px;
-            line-height: 1.5;
+            font-size: 11px;
+            line-height: 1.6;
             background: #1e1e1e;
             color: #00ff00;
             white-space: pre-wrap;
@@ -56,27 +62,20 @@
             text-align: center;
             padding: 50px 20px;
         }
-        svg {
-            width: 100%;
-            height: auto;
-        }
-        .block, .start-end {
+        .block-clickable {
             cursor: pointer;
             transition: all 0.2s ease;
         }
-        .block:hover, .start-end:hover, .decision:hover {
+        .block-clickable:hover {
             opacity: 0.7;
             filter: drop-shadow(0 0 8px #3498db);
-        }
-        .block.active, .start-end.active, .decision.active {
-            stroke-width: 3 !important;
-            filter: drop-shadow(0 0 12px #2ecc71);
         }
         .key-value {
             background: #2a2a2a;
             padding: 8px;
             margin: 5px 0;
             border-left: 3px solid #3498db;
+            border-radius: 3px;
         }
         .key-name {
             color: #61dafb;
@@ -85,12 +84,16 @@
         .key-value-text {
             color: #a6e22e;
             word-break: break-all;
+            display: block;
+            margin-top: 3px;
         }
         .step-title {
             color: #61dafb;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: bold;
             margin: 10px 0 5px 0;
+            border-bottom: 1px solid #3498db;
+            padding-bottom: 5px;
         }
         .loading {
             text-align: center;
@@ -101,14 +104,31 @@
             background: #3498db;
             color: white;
             border: none;
-            padding: 4px 8px;
+            padding: 3px 6px;
             border-radius: 3px;
-            font-size: 11px;
+            font-size: 10px;
             cursor: pointer;
             margin-left: 5px;
+            vertical-align: middle;
         }
         .copy-btn:hover {
             background: #2980b9;
+        }
+        .log-line {
+            margin: 2px 0;
+            padding: 2px 0;
+        }
+        .log-success {
+            color: #2ecc71;
+        }
+        .log-error {
+            color: #e74c3c;
+        }
+        .log-info {
+            color: #f39c12;
+        }
+        .log-normal {
+            color: #bbb;
         }
         @media (max-width: 1024px) {
             .logs-section {
@@ -131,47 +151,123 @@
 <body>
     <div class="container">
         <div class="diagram-section">
-            <svg id="flowchart" viewBox="0 0 800 2200" xmlns="http://www.w3.org/2000/svg">
-                <!-- Диаграмма будет загружена здесь -->
-            </svg>
+            <div class="mermaid" id="flowchart">
+            </div>
         </div>
         <div class="logs-section">
             <div class="logs-header">📋 Логи операции</div>
             <div class="logs-content" id="logs-content">
-                <div class="logs-empty">Наведите на блок диаграммы</div>
+                <div class="logs-empty">Нажмите на блок диаграммы</div>
             </div>
         </div>
     </div>
 
     <script>
-        const logsContent = document.getElementById('logs-content');
-        const flowchart = document.getElementById('flowchart');
+        const diagramDef = `
+graph TD
+    A["<b>1.0 НАЧАЛО</b><br/>Инициализация"] -->|client| B["<b>1.1</b> Web UI/CLI"]
+    B --> C["<b>1.2</b> Подключение<br/>к серверу WSS"]
+    C --> D["<b>1.3</b> Экран входа/<br/>регистрации"]
+    D --> E{<b>1.4</b><br/>Новый<br/>пользователь?}
 
-        // Загрузка SVG
-        fetch('/static/flowchart.svg')
-            .then(r => r.text())
-            .then(svg => {
-                flowchart.innerHTML = svg;
-                attachEventListeners();
-            });
+    E -->|НЕТ| F["<b>2.0 ВХОД</b>"]
+    E -->|ДА| G["<b>3.0 РЕГИСТРАЦИЯ</b>"]
+
+    %% === ВХОД ===
+    F --> F1["<b>2.1</b> Ввод<br/>username, password"]
+    F1 --> F2["<b>2.2</b> WSS login<br/>на сервер"]
+    F2 --> F3["<b>2.3</b> Проверка<br/>PBKDF2-SHA256"]
+    F3 --> F4{<b>2.4</b><br/>Пароль<br/>верный?}
+    F4 -->|НЕТ| F5["<b>2.5</b> ❌ Ошибка"]
+    F5 --> F1
+    F4 -->|ДА| F6["<b>2.6</b> Загрузка<br/>контактов Redis"]
+
+    %% === РЕГИСТРАЦИЯ ===
+    G --> G1["<b>3.1</b> Ввод<br/>username, password"]
+    G1 --> G2["<b>3.2</b> Генерация ключей<br/>IK, SPK, OPK"]
+    G2 --> G3["<b>3.3</b> Загрузка bundle<br/>в KDS HTTPS"]
+    G3 --> G4["<b>3.4</b> WSS register<br/>на сервер"]
+    G4 --> G5["<b>3.5</b> Сохранение<br/>ключей на диск"]
+
+    %% Слияние потоков
+    F6 --> H["<b>4.0</b> Интерфейс чата"]
+    G5 --> H
+
+    %% === ГЛАВНЫЙ ЦИКЛ ===
+    H --> I["<b>5.0</b> Выбор действия"]
+    I --> J{<b>5.1</b><br/>Отправить<br/>сообщение?}
+
+    J -->|НЕТ| K["<b>5.7</b> Ожидание<br/>входящих WSS"]
+    J -->|ДА| L["<b>5.2</b> Выбор получателя<br/>+ ввод текста"]
+
+    %% === ОТПРАВКА ===
+    L --> L1["<b>5.3</b> Запрос bundle<br/>получателя у KDS"]
+    L1 --> L2{<b>5.4</b><br/>Сессия<br/>существует?}
+    L2 -->|НЕТ| L3["<b>5.5</b> X3DH initiate<br/>DH1, DH2, DH3, DH4"]
+    L3 --> L4["<b>5.6</b> Encrypt<br/>Double Ratchet"]
+    L4 --> L5["<b>5.7</b> Отправка<br/>на сервер WSS"]
+    L2 -->|ДА| L4
+
+    %% === ПОЛУЧЕНИЕ ===
+    K --> R1["<b>6.0</b> Получено<br/>с сервера WSS"]
+    R1 --> R2["<b>6.1</b> Проверка<br/>отправителя"]
+    R2 --> R3{<b>6.2</b><br/>Сессия<br/>существует?}
+    R3 -->|ДА| R4["<b>6.3</b> Decrypt<br/>Double Ratchet"]
+    R3 -->|НЕТ| R5["<b>6.5</b> X3DH receive<br/>DH1, DH2, DH3, DH4"]
+    R5 --> R6["<b>6.6</b> Decrypt<br/>Double Ratchet"]
+    R4 --> R7["<b>6.4</b> Показать<br/>в интерфейсе"]
+    R6 --> R7
+
+    L5 --> I
+    R7 --> I
+
+    %% === ВЫХОД ===
+    I --> X{<b>7.0</b><br/>Выход?}
+    X -->|НЕТ| I
+    X -->|ДА| Y["<b>7.1</b> Выход<br/>пользователя"]
+    Y --> Z["<b>7.2</b> Close WSS"]
+    Z --> Z2["<b>7.3</b> Очистка<br/>сессий"]
+    Z2 --> END["<b>7.4 КОНЕЦ</b>"]
+
+    style A fill:#e8f4f8
+    style END fill:#e8f4f8
+    style G fill:#e8ffe8
+    style H fill:#fff9e6
+    style I fill:#fff9e6
+    style L5 fill:#fff0e6
+    style R7 fill:#e6f3ff
+        `;
+
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+        document.getElementById('flowchart').innerHTML = diagramDef;
+        mermaid.render('flowchart', diagramDef).then(({ svg }) => {
+            document.getElementById('flowchart').innerHTML = svg;
+            attachEventListeners();
+        });
+
+        const logsContent = document.getElementById('logs-content');
 
         function attachEventListeners() {
-            const blocks = flowchart.querySelectorAll('[id^="step-"]');
-            blocks.forEach(block => {
-                block.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const stepId = block.id.replace('step-', '');
-                    loadStepLogs(stepId);
-
-                    // Визуальное выделение
-                    blocks.forEach(b => b.classList.remove('active'));
-                    block.classList.add('active');
-                });
-
-                block.addEventListener('mouseenter', () => {
-                    const stepId = block.id.replace('step-', '');
-                    loadStepLogs(stepId);
-                });
+            // Ищем все текстовые элементы в SVG
+            const textElements = document.querySelectorAll('#flowchart text');
+            textElements.forEach(el => {
+                const text = el.textContent;
+                const match = text.match(/^<b>(\d+\.\d+)<\/b>/);
+                if (match) {
+                    const stepId = match[1];
+                    const rect = el.closest('g')?.querySelector('rect');
+                    if (rect) {
+                        rect.style.cursor = 'pointer';
+                        rect.addEventListener('click', () => loadStepLogs(stepId));
+                        rect.addEventListener('mouseenter', () => {
+                            rect.style.opacity = '0.7';
+                            loadStepLogs(stepId);
+                        });
+                        rect.addEventListener('mouseleave', () => {
+                            rect.style.opacity = '1';
+                        });
+                    }
+                }
             });
         }
 
@@ -184,24 +280,23 @@
                     let html = '';
 
                     // Заголовок
-                    html += `<div class="step-title">${data.step_id} ${data.title}</div>`;
-                    html += `<div style="color: #bbb; font-size: 11px; margin-bottom: 10px;">${data.description}</div>`;
+                    html += `<div class="step-title">📍 ${data.step_id} — ${data.title}</div>`;
+                    html += `<div style="color: #bbb; font-size: 10px; margin-bottom: 10px;">${data.description}</div>`;
 
                     // Логи
-                    if (data.logs) {
+                    if (data.logs && data.logs.trim()) {
                         html += `<div class="step-title">📝 Логи:</div>`;
                         const logLines = data.logs.split('\n').filter(l => l.trim());
-                        logLines.forEach(line => {
-                            // Подсветка разных типов логов
+                        logLines.slice(-30).forEach(line => {
+                            let className = 'log-normal';
                             if (line.includes('✓') || line.includes('ГОТОВО')) {
-                                html += `<div style="color: #2ecc71;">${escapeHtml(line)}</div>`;
+                                className = 'log-success';
                             } else if (line.includes('✗') || line.includes('ошибка')) {
-                                html += `<div style="color: #e74c3c;">${escapeHtml(line)}</div>`;
+                                className = 'log-error';
                             } else if (line.includes('[')) {
-                                html += `<div style="color: #f39c12;">${escapeHtml(line)}</div>`;
-                            } else {
-                                html += `<div>${escapeHtml(line)}</div>`;
+                                className = 'log-info';
                             }
+                            html += `<div class="log-line ${className}">${escapeHtml(line)}</div>`;
                         });
                     }
 
@@ -214,11 +309,12 @@
                             if (typeof value === 'object') {
                                 displayValue = JSON.stringify(value, null, 2);
                             }
+                            const displayStr = escapeHtml(displayValue.toString());
                             html += `
                                 <div class="key-value">
-                                    <span class="key-name">${escapeHtml(key)}:</span>
-                                    <button class="copy-btn" onclick="copyToClipboard('${escapeHtml(displayValue.toString())}')">📋</button>
-                                    <br><span class="key-value-text">${escapeHtml(displayValue.toString())}</span>
+                                    <span class="key-name">${escapeHtml(key)}</span>
+                                    <button class="copy-btn" onclick="copyToClipboard('${displayStr}')">📋</button>
+                                    <span class="key-value-text">${displayStr}</span>
                                 </div>
                             `;
                         }
@@ -226,13 +322,13 @@
 
                     // Длительность
                     if (data.duration_ms) {
-                        html += `<div style="color: #95a5a6; margin-top: 10px; font-size: 11px;">⏱️ Время: ${data.duration_ms}ms</div>`;
+                        html += `<div style="color: #95a5a6; margin-top: 10px; font-size: 10px; border-top: 1px solid #444; padding-top: 10px;">⏱️ Время: ${data.duration_ms}ms</div>`;
                     }
 
                     logsContent.innerHTML = html;
                 })
                 .catch(err => {
-                    logsContent.innerHTML = `<div class="logs-empty">❌ Ошибка загрузки логов:<br>${err.message}</div>`;
+                    logsContent.innerHTML = `<div class="logs-empty">❌ Ошибка:<br>${err.message}</div>`;
                 });
         }
 
@@ -250,13 +346,10 @@
         function copyToClipboard(text) {
             navigator.clipboard.writeText(text).then(() => {
                 alert('✓ Скопировано в буфер обмена');
+            }).catch(() => {
+                alert('❌ Ошибка при копировании');
             });
         }
-
-        // Закрытие сессии
-        window.addEventListener('beforeunload', () => {
-            fetch('/api/flowchart/session', { method: 'DELETE' });
-        });
     </script>
 </body>
 </html>
