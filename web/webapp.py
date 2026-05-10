@@ -30,6 +30,7 @@ import websockets
 from crypto.keymanager import KeyManager
 from crypto.sessionmanager import SessionManager
 from log_utils import get_file_logger, h, b64s, SEP, SEP2
+from flowchart_api import get_step_logs
 
 logging.basicConfig(
     level=logging.INFO,
@@ -232,6 +233,17 @@ def index():
 @app.route('/logs')
 def logs_page():
     return render_template('logs.html')
+
+
+@app.route('/flowchart')
+def flowchart_page():
+    return render_template('flowchart.html')
+
+
+@app.route('/api/flowchart/step/<step_id>')
+def api_flowchart_step(step_id):
+    data = get_step_logs(step_id)
+    return jsonify(data)
 
 
 @app.route('/api/logs')
